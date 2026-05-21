@@ -1,6 +1,9 @@
-# Call Center RAG Assistant with FastAPI, Docker and Vector Search
+# Call Center RAG Assistant
+### FastAPI · ChromaDB · Vector Search · Local LLM (Ollama) · Docker
 
-A production-style **Retrieval-Augmented Generation (RAG)** backend designed for call center agents. The system retrieves relevant policy documents and generates context-aware answers using semantic vector search and a local LLM.
+A production-style **Retrieval-Augmented Generation (RAG)** backend designed for call center agents. The system retrieves relevant policy documents and generates context-aware, hallucination-resistant answers using semantic vector search and a locally-running LLM.
+
+> **LLM Backend:** This project uses **Ollama (llama3.2)** running locally by default — no API key or internet required for inference. The architecture is designed to be LLM-agnostic; swapping to **Gemini API** or **OpenAI** requires only changing the `llm_service.py` module.
 
 ---
 
@@ -8,9 +11,9 @@ A production-style **Retrieval-Augmented Generation (RAG)** backend designed for
 
 - 📄 **Document Ingestion** — Load policy/FAQ documents into the vector knowledge base
 - 🔍 **Semantic Vector Search** — ChromaDB-powered similarity search over embedded documents
-- 🤖 **LLM Response Generation** — Context-aware answers grounded in retrieved documents (Ollama / Gemini API)
-- ⚡ **FastAPI Backend** — Lightweight, async REST API with auto-generated Swagger docs
-- 🐳 **Docker Support** — Fully containerized for consistent deployment
+- 🤖 **Local LLM Inference** — Context-aware answers via Ollama (llama3.2) — runs fully offline
+- ⚡ **FastAPI Backend** — Lightweight async REST API with auto-generated Swagger/OpenAPI docs
+- 🐳 **Docker Support** — Fully containerized for consistent, portable deployment
 
 ---
 
@@ -26,10 +29,10 @@ User Question
 [Embedding Model]        ← sentence-transformers (all-MiniLM-L6-v2)
      │
      ▼
-[ChromaDB Vector Search] ← finds top-k similar document chunks
+[ChromaDB Vector Search] ← finds top-k semantically similar document chunks
      │
      ▼
-[Ollama LLM]             ← llama3.2 running locally
+[Ollama llama3.2]        ← local LLM, no internet required
      │
      ▼
 Context-aware Answer
@@ -44,7 +47,7 @@ Context-aware Answer
 | API Framework | FastAPI |
 | Vector Database | ChromaDB |
 | Embedding Model | sentence-transformers (all-MiniLM-L6-v2) |
-| LLM | Ollama (llama3.2) / Gemini API |
+| LLM | Ollama (llama3.2) — local, offline |
 | Containerization | Docker |
 | Language | Python 3.11+ |
 
@@ -56,20 +59,22 @@ Context-aware Answer
 call-center-rag-assistant/
 ├── app/
 │   ├── main.py              # FastAPI app entry point
-│   ├── config.py            # Environment config
+│   ├── config.py            # Environment config (.env)
 │   ├── routers/
-│   │   └── query.py         # /query/ask endpoint
+│   │   └── query.py         # POST /query/ask endpoint
 │   ├── services/
 │   │   ├── vector_store.py  # ChromaDB + embedding logic
 │   │   └── llm_service.py   # Ollama LLM integration
 │   └── models/
 ├── data/
-│   └── sample_docs.py       # Sample call center documents
-├── tests/                   # (in progress)
+│   └── sample_docs.py       # Sample call center policy documents
+├── tests/
+│   ├── test_api.py          # FastAPI endpoint tests
+│   └── test_vector_store.py # Vector search unit tests
 ├── ingest_samples.py        # Script to load docs into ChromaDB
 ├── Dockerfile
 ├── requirements.txt
-└── .env                     # API keys (not committed)
+└── .env.example
 ```
 
 ---
@@ -96,34 +101,27 @@ source venv/bin/activate  # Mac/Linux
 pip install -r requirements.txt
 ```
 
-### 4. Set up environment variables
-
-```bash
-cp .env.example .env
-# Add your GEMINI_API_KEY if using Gemini instead of Ollama
-```
-
-### 5. Install and start Ollama
+### 4. Install and start Ollama
 
 ```bash
 # Download from https://ollama.com
 ollama pull llama3.2
 ```
 
-### 6. Ingest sample documents
+### 5. Ingest sample documents
 
 ```bash
 python ingest_samples.py
 ```
 
-### 7. Run the API
+### 6. Run the API
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-API will be available at `http://localhost:8000`
-Swagger docs at `http://localhost:8000/docs`
+- API: `http://localhost:8000`
+- Swagger docs: `http://localhost:8000/docs`
 
 ---
 
@@ -140,7 +138,7 @@ docker run -p 8000:8000 call-center-rag-assistant
 
 ### `POST /query/ask`
 
-Ask a question and get a context-aware answer from the knowledge base.
+Ask a question and get a grounded, context-aware answer from the knowledge base.
 
 **Request:**
 ```json
@@ -163,12 +161,43 @@ Ask a question and get a context-aware answer from the knowledge base.
 
 ---
 
+## 🧪 Tests
+
+```bash
+pip install pytest
+pytest tests/
+```
+
+---
+
 ## 🗺️ Roadmap
 
+### Core API
 - [ ] `POST /documents/ingest` — Upload new documents via API
 - [ ] `GET /documents` — List all documents in the knowledge base
 - [ ] `DELETE /documents/{id}` — Remove a document
-- [ ] Unit tests with pytest
-- [ ] docker-compose with Ollama service
-- [ ] Streaming responses via WebSocket
-- [ ] Gemini API as alternative LLM backend
+
+### Speech & Conversation Intelligence _(aligned with contact center use cases)_
+- [ ] Call transcript ingestion and analysis
+- [ ] Speaker-based conversation chunking (agent vs. customer turns)
+- [ ] Customer intent classification from transcripts
+- [ ] Sentiment analysis on customer utterances
+- [ ] Automated call summarization
+
+### Infrastructure
+- [ ] Unit and integration tests with pytest
+- [ ] docker-compose with Ollama service included
+- [ ] Streaming LLM responses via WebSocket
+- [ ] Gemini API / OpenAI as pluggable LLM backends
+- [ ] CI/CD pipeline with GitHub Actions
+
+---
+
+## Switching LLM Backend
+
+The LLM layer is intentionally decoupled. To switch from Ollama to Gemini API:
+
+1. Add `GEMINI_API_KEY` to your `.env`
+2. Update `app/services/llm_service.py` to use `google-generativeai`
+
+No other changes needed.
